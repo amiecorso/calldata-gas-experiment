@@ -500,13 +500,79 @@ async function runExperiment() {
     logToUI('----------------------------------------')
 
     // Final comparison
-    logToUI('\nComparison:')
-    logToUI(`Calldata Optimized Total: ${calldataTotalFee} wei`)
-    logToUI(`Gas Optimized Total: ${gasTotalFee} wei`)
+    logToUI('\nGas Usage Comparison:')
+    logToUI('----------------------------------------')
+    logToUI('Operation          | L2 Gas | L2 Fee (wei)     | L1 Gas | L1 Fee (wei)     | Total Fee (wei)')
+    logToUI('------------------ | ------ | ---------------- | ------ | ---------------- | ----------------')
+    
+    // Calldata Optimized Auth
+    const cdAuthL2Fee = BigInt(receipt1.gasUsed) * BigInt(receipt1.effectiveGasPrice)
+    logToUI(
+      'Calldata Auth     | ' +
+      `${receipt1.gasUsed.toString().padEnd(6)} | ` +
+      `${cdAuthL2Fee.toString().padEnd(16)} | ` +
+      `${receipt1?.l1GasUsed?.toString().padEnd(6)} | ` +
+      `${BigInt(receipt1?.l1Fee ?? 0).toString().padEnd(16)} | ` +
+      `${calldataAuthFee.toString()}`
+    )
+
+    // Calldata Optimized Capture
+    const cdCaptureL2Fee = BigInt(captureReceipt1.gasUsed) * BigInt(captureReceipt1.effectiveGasPrice)
+    logToUI(
+      'Calldata Capture  | ' +
+      `${captureReceipt1.gasUsed.toString().padEnd(6)} | ` +
+      `${cdCaptureL2Fee.toString().padEnd(16)} | ` +
+      `${captureReceipt1?.l1GasUsed?.toString().padEnd(6)} | ` +
+      `${BigInt(captureReceipt1?.l1Fee ?? 0).toString().padEnd(16)} | ` +
+      `${calldataCaptureFee.toString()}`
+    )
+
+    // Gas Optimized Auth
+    const gasAuthL2Fee = BigInt(receipt2.gasUsed) * BigInt(receipt2.effectiveGasPrice)
+    logToUI(
+      'Gas Opt Auth      | ' +
+      `${receipt2.gasUsed.toString().padEnd(6)} | ` +
+      `${gasAuthL2Fee.toString().padEnd(16)} | ` +
+      `${receipt2?.l1GasUsed?.toString().padEnd(6)} | ` +
+      `${BigInt(receipt2?.l1Fee ?? 0).toString().padEnd(16)} | ` +
+      `${gasAuthFee.toString()}`
+    )
+
+    // Gas Optimized Capture
+    const gasCaptureL2Fee = BigInt(captureReceipt2.gasUsed) * BigInt(captureReceipt2.effectiveGasPrice)
+    logToUI(
+      'Gas Opt Capture   | ' +
+      `${captureReceipt2.gasUsed.toString().padEnd(6)} | ` +
+      `${gasCaptureL2Fee.toString().padEnd(16)} | ` +
+      `${captureReceipt2?.l1GasUsed?.toString().padEnd(6)} | ` +
+      `${BigInt(captureReceipt2?.l1Fee ?? 0).toString().padEnd(16)} | ` +
+      `${gasCaptureFee.toString()}`
+    )
+
+    logToUI('------------------ | ------ | ---------------- | ------ | ---------------- | ----------------')
+    logToUI(
+      'TOTALS            | ' +
+      `${(receipt1.gasUsed + captureReceipt1.gasUsed).toString().padEnd(6)} | ` +
+      `${(cdAuthL2Fee + cdCaptureL2Fee).toString().padEnd(16)} | ` +
+      `${(Number(receipt1?.l1GasUsed ?? 0) + Number(captureReceipt1?.l1GasUsed ?? 0)).toString().padEnd(6)} | ` +
+      `${(BigInt(receipt1?.l1Fee ?? 0) + BigInt(captureReceipt1?.l1Fee ?? 0)).toString().padEnd(16)} | ` +
+      `${calldataTotalFee.toString()}`
+    )
+    logToUI(
+      '                  | ' +
+      `${(receipt2.gasUsed + captureReceipt2.gasUsed).toString().padEnd(6)} | ` +
+      `${(gasAuthL2Fee + gasCaptureL2Fee).toString().padEnd(16)} | ` +
+      `${(Number(receipt2?.l1GasUsed ?? 0) + Number(captureReceipt2?.l1GasUsed ?? 0)).toString().padEnd(6)} | ` +
+      `${(BigInt(receipt2?.l1Fee ?? 0) + BigInt(captureReceipt2?.l1Fee ?? 0)).toString().padEnd(16)} | ` +
+      `${gasTotalFee.toString()}`
+    )
+    logToUI('----------------------------------------')
+
+    // Show the difference
     const diff = calldataTotalFee > gasTotalFee ? 
       `Gas Optimized saved ${calldataTotalFee - gasTotalFee} wei` :
       `Calldata Optimized saved ${gasTotalFee - calldataTotalFee} wei`
-    logToUI(`Difference: ${diff}`)
+    logToUI(`\n${diff}`)
 
     return {
       calldataOptimized: {
