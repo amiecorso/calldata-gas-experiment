@@ -100,26 +100,23 @@ function createPaymentDetails(
 
 const BASESCAN_URL = 'https://basescan.org/tx'
 
-async function generateERC3009Signature_calldataOptimized(
-  walletClient: WalletClient,
+function calculatePaymentHash(
   paymentDetails: PaymentDetails,
-  salt: bigint,
-  targetContract: Address
-): Promise<`0x${string}`> {
-  // Create the payment hash using abi.encode format
-  const paymentHash = keccak256(
+  salt: bigint
+): Hash {
+  return keccak256(
     encodeAbiParameters(
       [
-        { type: 'uint256' },
-        { type: 'uint256' },
-        { type: 'uint256' },
-        { type: 'uint48' },
-        { type: 'address' },
-        { type: 'address' },
-        { type: 'uint16' },
-        { type: 'address' },
-        { type: 'address' },
-        { type: 'uint256' }
+        { type: 'uint256' },  // value
+        { type: 'uint256' },  // validAfter
+        { type: 'uint256' },  // validBefore
+        { type: 'uint48' },   // captureDeadline
+        { type: 'address' },  // operator
+        { type: 'address' },  // captureAddress
+        { type: 'uint16' },   // feeBps
+        { type: 'address' },  // feeRecipient
+        { type: 'address' },  // token
+        { type: 'uint256' }   // salt
       ],
       [
         paymentDetails.value,
@@ -135,6 +132,16 @@ async function generateERC3009Signature_calldataOptimized(
       ]
     )
   )
+}
+
+async function generateERC3009Signature_calldataOptimized(
+  walletClient: WalletClient,
+  paymentDetails: PaymentDetails,
+  salt: bigint,
+  targetContract: Address
+): Promise<`0x${string}`> {
+  // Create the payment hash using abi.encode format
+  const paymentHash = calculatePaymentHash(paymentDetails, salt)
 
   logToUI(`Payment Hash (nonce): ${paymentHash}`)
   logToUI(`From: ${paymentDetails.buyer}`)
@@ -321,6 +328,27 @@ async function authorizePaymentGas(
   return hash
 }
 
+async function capturePaymentCalldata(
+  paymentDetails: PaymentDetails,
+  paymentHash: Hash,
+): Promise<Hash> {
+  logToUI('\nCapturing payment in Calldata Optimized Contract...')
+  logToUI(`Operator address: ${paymentDetails.operator}`)
+  logToUI(`Sender address: ${account.address}`)
+  
+  const hash = await walletClient.writeContract({
+    address: PAYMENT_ESCROW_CALLDATA_OPTIMIZED_ADDRESS,
+    abi: PaymentEscrowCalldataOptimizedAbi,
+    functionName: 'capture',
+    args: [
+      paymentHash,
+      paymentDetails.value
+    ]
+  })
+
+  return hash
+}
+
 // Updated main experiment function
 async function runExperiment() {
   try {
@@ -338,6 +366,7 @@ async function runExperiment() {
 
     // Test Calldata Optimized Contract
     logToUI('\n=== Testing Calldata Optimized Contract ===')
+    const paymentHash = calculatePaymentHash(paymentDetails, SALT_CALLDATA_OPT)
     const signature1 = await generateERC3009Signature_calldataOptimized(
       walletClient, 
       paymentDetails, 
@@ -346,31 +375,25 @@ async function runExperiment() {
     )
     logToUI('Signature generated for calldata optimized contract')
     const txHash1 = await authorizePaymentCalldata(paymentDetails, signature1)
-    logToUI(`Transaction submitted: ${BASESCAN_URL}/${txHash1}`)
+    logToUI(`Authorization submitted: ${BASESCAN_URL}/${txHash1}`)
     const receipt1 = await publicClient.waitForTransactionReceipt({ hash: txHash1 })
-    logToUI('\nCalldata Optimized Contract Receipt:')
+    logToUI('\nCalldata Optimized Contract Authorization Receipt:')
     logToUI(JSON.stringify(receipt1, (key, value) => 
       typeof value === 'bigint' ? value.toString() : value, 2))
 
-    // Test Gas Optimized Contract
-    logToUI('\n=== Testing Gas Optimized Contract ===')
-    const signature2 = await generateERC3009Signature_gasOptimized(
-      walletClient, 
-      paymentDetails, 
-      SALT_GAS_OPT,
-      PAYMENT_ESCROW_GAS_OPTIMIZED_ADDRESS
-    )
-    logToUI('Signature generated for gas optimized contract')
-    const txHash2 = await authorizePaymentGas(paymentDetails, signature2)
-    logToUI(`Transaction submitted: ${BASESCAN_URL}/${txHash2}`)
-    const receipt2 = await publicClient.waitForTransactionReceipt({ hash: txHash2 })
-    logToUI('\nGas Optimized Contract Receipt:')
-    logToUI(JSON.stringify(receipt2, (key, value) => 
+    // Use the same hash for capture
+    const captureTxHash = await capturePaymentCalldata(paymentDetails, paymentHash)
+    logToUI(`Capture submitted: ${BASESCAN_URL}/${captureTxHash}`)
+    const captureReceipt = await publicClient.waitForTransactionReceipt({ hash: captureTxHash })
+    logToUI('\nCalldata Optimized Contract Capture Receipt:')
+    logToUI(JSON.stringify(captureReceipt, (key, value) => 
       typeof value === 'bigint' ? value.toString() : value, 2))
 
     return {
-      calldataOptimized: receipt1,
-      gasOptimized: receipt2
+      calldataOptimized: {
+        authorize: receipt1,
+        capture: captureReceipt
+      }
     }
   } catch (error) {
     logToUI(`ERROR: ${error instanceof Error ? error.message : String(error)}`)
