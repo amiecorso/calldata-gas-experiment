@@ -349,6 +349,59 @@ async function capturePaymentCalldata(
   return hash
 }
 
+async function capturePaymentGas(
+  paymentDetails: PaymentDetails,
+): Promise<Hash> {
+  logToUI('\nCapturing payment in Gas Optimized Contract...')
+  logToUI(`Operator address: ${paymentDetails.operator}`)
+  logToUI(`Sender address: ${account.address}`)
+  
+  // Encode the Authorization struct
+  const encodedDetails = encodeAbiParameters(
+    [{
+      type: 'tuple',
+      components: [
+        { name: 'token', type: 'address' },
+        { name: 'buyer', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'validAfter', type: 'uint256' },
+        { name: 'validBefore', type: 'uint256' },
+        { name: 'captureDeadline', type: 'uint48' },
+        { name: 'operator', type: 'address' },
+        { name: 'captureAddress', type: 'address' },
+        { name: 'feeBps', type: 'uint16' },
+        { name: 'feeRecipient', type: 'address' },
+        { name: 'salt', type: 'uint256' }
+      ]
+    }],
+    [{
+      token: paymentDetails.token,
+      buyer: paymentDetails.buyer,
+      value: paymentDetails.value,
+      validAfter: VALID_AFTER,
+      validBefore: VALID_BEFORE,
+      captureDeadline: paymentDetails.captureDeadline,
+      operator: paymentDetails.operator,
+      captureAddress: paymentDetails.captureAddress,
+      feeBps: paymentDetails.feeBps,
+      feeRecipient: paymentDetails.feeRecipient,
+      salt: SALT_GAS_OPT
+    }]
+  )
+
+  const hash = await walletClient.writeContract({
+    address: PAYMENT_ESCROW_GAS_OPTIMIZED_ADDRESS,
+    abi: PaymentEscrowGasOptimizedAbi,
+    functionName: 'capture',
+    args: [
+      paymentDetails.value,
+      encodedDetails
+    ]
+  })
+
+  return hash
+}
+
 // Updated main experiment function
 async function runExperiment() {
   try {
@@ -384,15 +437,43 @@ async function runExperiment() {
     // Use the same hash for capture
     const captureTxHash = await capturePaymentCalldata(paymentDetails, paymentHash)
     logToUI(`Capture submitted: ${BASESCAN_URL}/${captureTxHash}`)
-    const captureReceipt = await publicClient.waitForTransactionReceipt({ hash: captureTxHash })
+    const captureReceipt1 = await publicClient.waitForTransactionReceipt({ hash: captureTxHash })
     logToUI('\nCalldata Optimized Contract Capture Receipt:')
-    logToUI(JSON.stringify(captureReceipt, (key, value) => 
+    logToUI(JSON.stringify(captureReceipt1, (key, value) => 
+      typeof value === 'bigint' ? value.toString() : value, 2))
+
+    // Test Gas Optimized Contract
+    logToUI('\n=== Testing Gas Optimized Contract ===')
+    const signature2 = await generateERC3009Signature_gasOptimized(
+      walletClient, 
+      paymentDetails, 
+      SALT_GAS_OPT,
+      PAYMENT_ESCROW_GAS_OPTIMIZED_ADDRESS
+    )
+    logToUI('Signature generated for gas optimized contract')
+    const txHash2 = await authorizePaymentGas(paymentDetails, signature2)
+    logToUI(`Authorization submitted: ${BASESCAN_URL}/${txHash2}`)
+    const receipt2 = await publicClient.waitForTransactionReceipt({ hash: txHash2 })
+    logToUI('\nGas Optimized Contract Authorization Receipt:')
+    logToUI(JSON.stringify(receipt2, (key, value) => 
+      typeof value === 'bigint' ? value.toString() : value, 2))
+
+    // Capture the payment
+    const captureTxHash2 = await capturePaymentGas(paymentDetails)
+    logToUI(`Capture submitted: ${BASESCAN_URL}/${captureTxHash2}`)
+    const captureReceipt2 = await publicClient.waitForTransactionReceipt({ hash: captureTxHash2 })
+    logToUI('\nGas Optimized Contract Capture Receipt:')
+    logToUI(JSON.stringify(captureReceipt2, (key, value) => 
       typeof value === 'bigint' ? value.toString() : value, 2))
 
     return {
       calldataOptimized: {
         authorize: receipt1,
-        capture: captureReceipt
+        capture: captureReceipt1
+      },
+      gasOptimized: {
+        authorize: receipt2,
+        capture: captureReceipt2
       }
     }
   } catch (error) {
