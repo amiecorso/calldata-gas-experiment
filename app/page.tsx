@@ -1,16 +1,24 @@
 'use client';
 
 import { useState } from 'react'
-import { runExperiment } from './lib/scripts/payment-escrow-experiment'
+import { runExperiment, setLogFunction } from './lib/scripts/payment-escrow-experiment'
 
 export default function Home() {
   const [result, setResult] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
 
   const handleRunExperiment = async () => {
     setLoading(true)
     setError(null)
+    setLogs([]) // Clear previous logs
+    
+    // Set up logging
+    setLogFunction((message: string) => {
+      setLogs(prev => [...prev, message])
+    })
+    
     try {
       const receipt = await runExperiment()
       setResult(JSON.stringify(receipt, null, 2))
@@ -45,6 +53,15 @@ export default function Home() {
           <h2 className="text-xl font-bold mb-2">Results:</h2>
           <pre className="bg-gray-100 p-4 rounded overflow-auto">
             {result}
+          </pre>
+        </div>
+      )}
+
+      {logs.length > 0 && (
+        <div className="mt-4">
+          <h2 className="text-xl font-bold mb-2">Logs:</h2>
+          <pre className="bg-gray-100 p-4 rounded overflow-auto">
+            {logs.join('\n')}
           </pre>
         </div>
       )}
