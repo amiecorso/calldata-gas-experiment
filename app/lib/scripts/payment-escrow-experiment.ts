@@ -69,7 +69,7 @@ const walletClient = createWalletClient({
     account
   })
 
-// Add this at the top of the file
+// Update the log function type to accept HTML
 let logToUI: (message: string) => void = console.log;
 export function setLogFunction(fn: typeof logToUI) {
   logToUI = fn;
@@ -87,7 +87,7 @@ function createPaymentDetails(
     captureAddress: CAPTURE_ADDRESS as Address,
     value: PAYMENT_AMOUNT,
     captureDeadline: CAPTURE_DEADLINE,
-    feeRecipient: '0x0000000000000000000000000000000000000000',
+    feeRecipient: '0x0000000000000000000000000000000000000000' as Address,
     feeBps: 0
   }
   
@@ -143,12 +143,12 @@ async function generateERC3009Signature_calldataOptimized(
   // Create the payment hash using abi.encode format
   const paymentHash = calculatePaymentHash(paymentDetails, salt)
 
-  logToUI(`Payment Hash (nonce): ${paymentHash}`)
-  logToUI(`From: ${paymentDetails.buyer}`)
-  logToUI(`To: ${targetContract}`)
-  logToUI(`Value: ${paymentDetails.value.toString()}`)
-  logToUI(`Valid After: ${VALID_AFTER.toString()}`)
-  logToUI(`Valid Before: ${VALID_BEFORE.toString()}`)
+  // logToUI(`Payment Hash (nonce): ${paymentHash}`)
+  // logToUI(`From: ${paymentDetails.buyer}`)
+  // logToUI(`To: ${targetContract}`)
+  // logToUI(`Value: ${paymentDetails.value.toString()}`)
+  // logToUI(`Valid After: ${VALID_AFTER.toString()}`)
+  // logToUI(`Valid Before: ${VALID_BEFORE.toString()}`)
 
   const signature = await walletClient.signTypedData({
     account,
@@ -211,12 +211,12 @@ async function generateERC3009Signature_gasOptimized(
     )
   )
 
-  logToUI(`Payment Hash (nonce): ${paymentHash}`)
-  logToUI(`From: ${paymentDetails.buyer}`)
-  logToUI(`To: ${targetContract}`)
-  logToUI(`Value: ${paymentDetails.value.toString()}`)
-  logToUI(`Valid After: ${VALID_AFTER.toString()}`)
-  logToUI(`Valid Before: ${VALID_BEFORE.toString()}`)
+  // logToUI(`Payment Hash (nonce): ${paymentHash}`)
+  // logToUI(`From: ${paymentDetails.buyer}`)
+  // logToUI(`To: ${targetContract}`)
+  // logToUI(`Value: ${paymentDetails.value.toString()}`)
+  // logToUI(`Valid After: ${VALID_AFTER.toString()}`)
+  // logToUI(`Valid Before: ${VALID_BEFORE.toString()}`)
 
   const signature = await walletClient.signTypedData({
     account,
@@ -264,19 +264,19 @@ async function authorizePaymentGas(
 ): Promise<Hash> {
   logToUI('\nSubmitting to Gas Optimized Contract...')
   
-  // Log the values we're encoding
-  logToUI('Encoding payment details:')
-  logToUI(`Token: ${paymentDetails.token}`)
-  logToUI(`Buyer: ${paymentDetails.buyer}`)
-  logToUI(`Value: ${paymentDetails.value.toString()}`)
-  logToUI(`ValidAfter: ${VALID_AFTER.toString()}`)
-  logToUI(`ValidBefore: ${VALID_BEFORE.toString()}`)
-  logToUI(`CaptureDeadline: ${paymentDetails.captureDeadline}`)
-  logToUI(`Operator: ${paymentDetails.operator}`)
-  logToUI(`CaptureAddress: ${paymentDetails.captureAddress}`)
-  logToUI(`FeeBps: ${paymentDetails.feeBps}`)
-  logToUI(`FeeRecipient: ${paymentDetails.feeRecipient}`)
-  logToUI(`Salt: ${SALT_GAS_OPT.toString()}`)
+  // // Log the values we're encoding
+  // logToUI('Encoding payment details:')
+  // logToUI(`Token: ${paymentDetails.token}`)
+  // logToUI(`Buyer: ${paymentDetails.buyer}`)
+  // logToUI(`Value: ${paymentDetails.value.toString()}`)
+  // logToUI(`ValidAfter: ${VALID_AFTER.toString()}`)
+  // logToUI(`ValidBefore: ${VALID_BEFORE.toString()}`)
+  // logToUI(`CaptureDeadline: ${paymentDetails.captureDeadline}`)
+  // logToUI(`Operator: ${paymentDetails.operator}`)
+  // logToUI(`CaptureAddress: ${paymentDetails.captureAddress}`)
+  // logToUI(`FeeBps: ${paymentDetails.feeBps}`)
+  // logToUI(`FeeRecipient: ${paymentDetails.feeRecipient}`)
+  // logToUI(`Salt: ${SALT_GAS_OPT.toString()}`)
 
   const encodedDetails = encodeAbiParameters(
     [
@@ -333,8 +333,6 @@ async function capturePaymentCalldata(
   paymentHash: Hash,
 ): Promise<Hash> {
   logToUI('\nCapturing payment in Calldata Optimized Contract...')
-  logToUI(`Operator address: ${paymentDetails.operator}`)
-  logToUI(`Sender address: ${account.address}`)
   
   const hash = await walletClient.writeContract({
     address: PAYMENT_ESCROW_CALLDATA_OPTIMIZED_ADDRESS,
@@ -353,8 +351,6 @@ async function capturePaymentGas(
   paymentDetails: PaymentDetails,
 ): Promise<Hash> {
   logToUI('\nCapturing payment in Gas Optimized Contract...')
-  logToUI(`Operator address: ${paymentDetails.operator}`)
-  logToUI(`Sender address: ${account.address}`)
   
   // Encode the Authorization struct
   const encodedDetails = encodeAbiParameters(
@@ -402,20 +398,59 @@ async function capturePaymentGas(
   return hash
 }
 
+function logGasMetrics(receipt: any, description: string): bigint {
+  // L2 Calculations
+  const l2Gas = receipt.gasUsed
+  const l2GasPrice = receipt.effectiveGasPrice
+  const l2Fee = BigInt(l2Gas) * BigInt(l2GasPrice)
+
+  // L1 Calculations
+  const l1Gas = receipt.l1GasUsed
+  const l1GasPrice = receipt.l1GasPrice
+  const l1Fee = BigInt(receipt.l1Fee)
+
+  // Total Fee
+  const totalFee = l2Fee + l1Fee
+
+  logToUI(`\n${description} Gas Metrics:`)
+  logToUI('L2:')
+  logToUI(`  Gas Used: ${l2Gas}`)
+  logToUI(`  Gas Price: ${l2GasPrice} wei`)
+  logToUI(`  Fee: ${l2Fee} wei (${formatEth(l2Fee)} ETH)`)
+  
+  logToUI('\nL1:')
+  logToUI(`  Gas Used: ${l1Gas}`)
+  logToUI(`  Gas Price: ${l1GasPrice} wei`)
+  logToUI(`  Fee: ${l1Fee} wei (${formatEth(l1Fee)} ETH)`)
+  
+  logToUI('\nTotal:')
+  logToUI(`  Total Fee: ${totalFee} wei (${formatEth(totalFee)} ETH)`)
+  logToUI('----------------------------------------')
+
+  return totalFee
+}
+
+// Helper to format wei to ETH with better precision
+function formatEth(wei: bigint): string {
+  return (Number(wei) / 1e18).toFixed(6)
+}
+
 // Updated main experiment function
 async function runExperiment() {
   try {
     logToUI('Starting experiment...')
-    const salt = BigInt(Math.floor(Math.random() * 1000000))
-    logToUI(`Generated salt: ${salt.toString()}`)
+    
+    // Log contract addresses
+    logToUI('\nContract Addresses:')
+    logToUI(`Calldata Optimized: ${PAYMENT_ESCROW_CALLDATA_OPTIMIZED_ADDRESS}`)
+    logToUI(`Gas Optimized: ${PAYMENT_ESCROW_GAS_OPTIMIZED_ADDRESS}`)
+    logToUI('----------------------------------------')
 
     // Create payment details (same for both contracts)
-    logToUI('Creating payment details...')
     const paymentDetails = createPaymentDetails(
       account.address,
       account.address
     )
-    logToUI('Payment details created successfully')
 
     // Test Calldata Optimized Contract
     logToUI('\n=== Testing Calldata Optimized Contract ===')
@@ -426,21 +461,20 @@ async function runExperiment() {
       SALT_CALLDATA_OPT,
       PAYMENT_ESCROW_CALLDATA_OPTIMIZED_ADDRESS
     )
-    logToUI('Signature generated for calldata optimized contract')
     const txHash1 = await authorizePaymentCalldata(paymentDetails, signature1)
     logToUI(`Authorization submitted: ${BASESCAN_URL}/${txHash1}`)
     const receipt1 = await publicClient.waitForTransactionReceipt({ hash: txHash1 })
-    logToUI('\nCalldata Optimized Contract Authorization Receipt:')
-    logToUI(JSON.stringify(receipt1, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value, 2))
+    const calldataAuthFee = logGasMetrics(receipt1, 'Calldata Optimized Authorization')
 
-    // Use the same hash for capture
     const captureTxHash = await capturePaymentCalldata(paymentDetails, paymentHash)
     logToUI(`Capture submitted: ${BASESCAN_URL}/${captureTxHash}`)
     const captureReceipt1 = await publicClient.waitForTransactionReceipt({ hash: captureTxHash })
-    logToUI('\nCalldata Optimized Contract Capture Receipt:')
-    logToUI(JSON.stringify(captureReceipt1, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value, 2))
+    const calldataCaptureFee = logGasMetrics(captureReceipt1, 'Calldata Optimized Capture')
+
+    const calldataTotalFee = calldataAuthFee + calldataCaptureFee
+    logToUI('\nCalldata Optimized Total Sequence:')
+    logToUI(`  Total Fee for Auth + Capture: ${calldataTotalFee} wei (${formatEth(calldataTotalFee)} ETH)`)
+    logToUI('----------------------------------------')
 
     // Test Gas Optimized Contract
     logToUI('\n=== Testing Gas Optimized Contract ===')
@@ -450,21 +484,29 @@ async function runExperiment() {
       SALT_GAS_OPT,
       PAYMENT_ESCROW_GAS_OPTIMIZED_ADDRESS
     )
-    logToUI('Signature generated for gas optimized contract')
     const txHash2 = await authorizePaymentGas(paymentDetails, signature2)
     logToUI(`Authorization submitted: ${BASESCAN_URL}/${txHash2}`)
     const receipt2 = await publicClient.waitForTransactionReceipt({ hash: txHash2 })
-    logToUI('\nGas Optimized Contract Authorization Receipt:')
-    logToUI(JSON.stringify(receipt2, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value, 2))
+    const gasAuthFee = logGasMetrics(receipt2, 'Gas Optimized Authorization')
 
-    // Capture the payment
     const captureTxHash2 = await capturePaymentGas(paymentDetails)
     logToUI(`Capture submitted: ${BASESCAN_URL}/${captureTxHash2}`)
     const captureReceipt2 = await publicClient.waitForTransactionReceipt({ hash: captureTxHash2 })
-    logToUI('\nGas Optimized Contract Capture Receipt:')
-    logToUI(JSON.stringify(captureReceipt2, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value, 2))
+    const gasCaptureFee = logGasMetrics(captureReceipt2, 'Gas Optimized Capture')
+
+    const gasTotalFee = gasAuthFee + gasCaptureFee
+    logToUI('\nGas Optimized Total Sequence:')
+    logToUI(`  Total Fee for Auth + Capture: ${gasTotalFee} wei (${formatEth(gasTotalFee)} ETH)`)
+    logToUI('----------------------------------------')
+
+    // Final comparison
+    logToUI('\nComparison:')
+    logToUI(`Calldata Optimized Total: ${calldataTotalFee} wei`)
+    logToUI(`Gas Optimized Total: ${gasTotalFee} wei`)
+    const diff = calldataTotalFee > gasTotalFee ? 
+      `Gas Optimized saved ${calldataTotalFee - gasTotalFee} wei` :
+      `Calldata Optimized saved ${gasTotalFee - calldataTotalFee} wei`
+    logToUI(`Difference: ${diff}`)
 
     return {
       calldataOptimized: {

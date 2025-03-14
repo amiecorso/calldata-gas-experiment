@@ -4,12 +4,12 @@ import { useState } from 'react'
 import { runExperiment, setLogFunction } from './lib/scripts/payment-escrow-experiment'
 
 export default function Home() {
-  const [result, setResult] = useState<string>('')
+  const [logs, setLogs] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [logs, setLogs] = useState<string[]>([])
+  const [result, setResult] = useState<string | null>(null)
 
-  const handleRunExperiment = async () => {
+  async function handleRunExperiment() {
     setLoading(true)
     setError(null)
     setLogs([]) // Clear previous logs
@@ -24,7 +24,7 @@ export default function Home() {
       setResult(JSON.stringify(receipt, null, 2))
     } catch (err) {
       console.error('Error running experiment:', err)
-      setError(err instanceof Error ? err.message : 'Unknown error occurred')
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
