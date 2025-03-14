@@ -568,10 +568,19 @@ async function runExperiment() {
     )
     logToUI('----------------------------------------')
 
-    // Show the difference
+    // Show the difference and percentages
+    const savings = calldataTotalFee > gasTotalFee ? 
+      calldataTotalFee - gasTotalFee : 
+      gasTotalFee - calldataTotalFee;
+    
+    const savingsPercent = calldataTotalFee > gasTotalFee ?
+      (Number(savings) / Number(calldataTotalFee) * 100).toFixed(2) :
+      (Number(savings) / Number(gasTotalFee) * 100).toFixed(2);
+
     const diff = calldataTotalFee > gasTotalFee ? 
-      `Gas Optimized saved ${calldataTotalFee - gasTotalFee} wei` :
-      `Calldata Optimized saved ${gasTotalFee - calldataTotalFee} wei`
+      `Gas Optimized saved ${savings} wei (${savingsPercent}% cheaper)` :
+      `Calldata Optimized saved ${savings} wei (${savingsPercent}% cheaper)`
+    
     logToUI(`\n${diff}`)
 
     return {
